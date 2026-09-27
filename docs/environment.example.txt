@@ -1,5 +1,5 @@
+# Copie este arquivo para .env apenas no desenvolvimento local.
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/wa_console?schema=public"
-# Em produção, use a URL sem pooler para migrations, quando o provedor oferecer.
 DIRECT_URL="postgresql://postgres:postgres@localhost:5432/wa_console?schema=public"
 REDIS_URL="redis://localhost:6379"
 APP_URL="http://localhost:3000"
@@ -8,14 +8,8 @@ OWNER_EMAIL="owner@example.com"
 OWNER_PASSWORD_HASH="\$2b\$12\$replace_with_bcrypt_hash"
 SETTINGS_ENCRYPTION_KEY="base64-encoded-32-byte-key"
 
-META_APP_ID=""
-META_APP_SECRET=""
-META_ACCESS_TOKEN=""
-META_WABA_ID=""
-META_PHONE_NUMBER_ID=""
+# Credenciais Meta são opcionais no ambiente; no modo live, cadastre-as pela interface.
 META_API_VERSION="v25.0"
-META_WEBHOOK_VERIFY_TOKEN=""
-META_WEBHOOK_APP_SECRET=""
 META_CLIENT_MODE="mock"
 
 DEFAULT_COUNTRY_CODE="55"

@@ -24,7 +24,7 @@ Importar um contato não altera automaticamente o consentimento. Contatos sem in
 
 ## Instalação
 
-1. Copie `.env.example` para `.env`.
+1. Copie `docs/environment.example.txt` para `.env`.
 2. Gere `AUTH_SECRET` com pelo menos 32 caracteres.
 3. Gere `SETTINGS_ENCRYPTION_KEY` com 32 bytes codificados em base64.
 4. Gere `OWNER_PASSWORD_HASH` com bcrypt, por exemplo: `node -e "require('bcryptjs').hash('SUA-SENHA',12).then(console.log)"`. No arquivo `.env`, escape cada `$` do hash como `\$` para impedir expansão pelo Next.js.
