@@ -1,4 +1,4 @@
-name: Deploy database migrations
+name: Initialize production database
 
 on:
   workflow_dispatch:
@@ -10,6 +10,9 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+      OWNER_PASSWORD_HASH: ${{ secrets.OWNER_PASSWORD_HASH }}
+      META_CLIENT_MODE: live
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,3 +21,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run db:deploy
+      - run: npm run db:seed

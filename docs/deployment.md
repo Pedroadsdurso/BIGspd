@@ -74,7 +74,7 @@ npm run db:deploy
 npm run db:seed
 ```
 
-O workflow manual `.github/workflows/migrate.yml` faz `db:deploy` usando os GitHub Environment secrets `DATABASE_URL` e `DIRECT_URL`. O seed cria/atualiza somente o proprietário configurado pelas variáveis `OWNER_EMAIL` e `OWNER_PASSWORD_HASH`.
+O workflow manual `.github/workflows/migrate.yml` executa migration e seed. Em **GitHub > Settings > Environments > production**, cadastre `DATABASE_URL`, `DIRECT_URL`, `OWNER_EMAIL` e `OWNER_PASSWORD_HASH`; depois execute **Actions > Initialize production database > Run workflow**. O seed cria ou atualiza somente o proprietário e não cria dados mock porque o workflow fixa `META_CLIENT_MODE=live`.
 
 Deploy pela integração Git da Vercel:
 
