@@ -1,20 +1,21 @@
-import { getEnv } from "@/lib/env";
 import { verifyMetaSignature, verifyWebhookChallenge } from "@/lib/webhooks/verify";
 import { persistAndProcessWebhook } from "@/lib/webhooks/service";
 import { log } from "@/lib/logger";
+import { getWebhookSecrets } from "@/lib/webhooks/secrets";
 
 export async function GET(request: Request) {
-  const challenge = verifyWebhookChallenge(new URL(request.url).searchParams, getEnv().META_WEBHOOK_VERIFY_TOKEN || "");
+  const { verifyToken } = await getWebhookSecrets();
+  const challenge = verifyWebhookChallenge(new URL(request.url).searchParams, verifyToken);
   return challenge ? new Response(challenge, { status: 200 }) : new Response("Forbidden", { status: 403 });
 }
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
-  const env = getEnv();
+  const { appSecret } = await getWebhookSecrets();
   const valid = verifyMetaSignature(
     rawBody,
     request.headers.get("x-hub-signature-256"),
-    env.META_WEBHOOK_APP_SECRET || env.META_APP_SECRET || "",
+    appSecret,
   );
   if (!valid) return new Response("Invalid signature", { status: 401 });
   try {

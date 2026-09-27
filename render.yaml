@@ -24,10 +24,6 @@ services:
         value: live
       - key: META_API_VERSION
         value: v25.0
-      - key: META_WEBHOOK_VERIFY_TOKEN
-        sync: false
-      - key: META_WEBHOOK_APP_SECRET
-        sync: false
       - key: DEFAULT_COUNTRY_CODE
         value: "55"
       - key: WORKER_CONCURRENCY

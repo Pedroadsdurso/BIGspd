@@ -6,7 +6,6 @@ const required = [
   "OWNER_EMAIL",
   "OWNER_PASSWORD_HASH",
   "SETTINGS_ENCRYPTION_KEY",
-  "META_WEBHOOK_VERIFY_TOKEN",
 ] as const;
 
 const failures: string[] = [];
@@ -17,10 +16,6 @@ for (const key of required) {
 
 if (process.env.META_CLIENT_MODE !== "live") {
   failures.push("META_CLIENT_MODE deve ser live para produção.");
-}
-
-if (!process.env.META_WEBHOOK_APP_SECRET?.trim() && !process.env.META_APP_SECRET?.trim()) {
-  failures.push("Defina META_WEBHOOK_APP_SECRET ou META_APP_SECRET.");
 }
 
 try {

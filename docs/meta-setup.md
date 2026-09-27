@@ -34,11 +34,7 @@ Defina na Vercel e no worker:
 ```dotenv
 META_CLIENT_MODE=live
 META_API_VERSION=v25.0
-META_WEBHOOK_VERIFY_TOKEN=<valor-aleatorio-longo>
-META_WEBHOOK_APP_SECRET=<app-secret-do-aplicativo-meta>
 ```
-
-`META_WEBHOOK_VERIFY_TOKEN` é uma string criada por você. Use exatamente o mesmo valor no painel da Meta. `META_WEBHOOK_APP_SECRET` é o App Secret da Meta e valida `X-Hub-Signature-256` em cada POST recebido.
 
 Os valores abaixo são opcionais no ambiente porque podem ser cadastrados pela tela protegida da aplicação:
 
@@ -48,9 +44,11 @@ META_WABA_ID=<waba-id>
 META_PHONE_NUMBER_ID=<phone-number-id>
 META_APP_ID=<app-id>
 META_APP_SECRET=<app-secret>
+META_WEBHOOK_VERIFY_TOKEN=<valor-aleatorio-longo>
+META_WEBHOOK_APP_SECRET=<app-secret-do-aplicativo-meta>
 ```
 
-Se o token for salvo pela interface, mantenha `SETTINGS_ENCRYPTION_KEY` estável. Trocar essa chave torna os tokens já cifrados ilegíveis.
+`META_WEBHOOK_VERIFY_TOKEN` é uma string criada por você e precisa ter pelo menos 16 caracteres. Use exatamente o mesmo valor no painel da Meta. O App Secret valida `X-Hub-Signature-256` em cada POST recebido. Se os segredos forem salvos pela interface, mantenha `SETTINGS_ENCRYPTION_KEY` estável: trocar essa chave torna os valores já cifrados ilegíveis.
 
 ## 4. Publicar e registrar o webhook
 
@@ -61,7 +59,7 @@ Se o token for salvo pela interface, mantenha `SETTINGS_ENCRYPTION_KEY` estável
    https://seu-dominio.vercel.app/api/webhooks/whatsapp
    ```
 
-3. Informe o mesmo `META_WEBHOOK_VERIFY_TOKEN` usado na Vercel.
+3. Informe o mesmo Webhook Verify Token salvo em **Configurações > WhatsApp**.
 4. Assine o campo `messages` para a WABA.
 5. A Meta fará um GET de verificação; a aplicação só devolve o challenge quando o token confere.
 6. Nos POSTs, a aplicação valida a assinatura do corpo bruto antes de persistir qualquer evento.
@@ -72,7 +70,7 @@ Use a [referência oficial de webhooks](https://developers.facebook.com/docs/wha
 
 1. Entre em `/login` com `OWNER_EMAIL` e a senha que originou `OWNER_PASSWORD_HASH`.
 2. Abra **Configurações > WhatsApp**.
-3. Informe WABA ID, Phone Number ID, token do system user e versão da API.
+3. Informe WABA ID, Phone Number ID, token do system user, App Secret, um Webhook Verify Token com 16+ caracteres e a versão da API.
 4. Salve e execute **Testar conexão**.
 5. Abra **Templates** e execute a sincronização.
 6. Importe contatos e registre o consentimento real. Importação, por si só, mantém o contato como `UNKNOWN`.

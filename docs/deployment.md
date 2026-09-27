@@ -48,8 +48,6 @@ OWNER_PASSWORD_HASH
 SETTINGS_ENCRYPTION_KEY
 META_CLIENT_MODE=live
 META_API_VERSION=v25.0
-META_WEBHOOK_VERIFY_TOKEN
-META_WEBHOOK_APP_SECRET
 DEFAULT_COUNTRY_CODE=55
 WORKER_CONCURRENCY=5
 WORKER_MAX_PER_SECOND=5
@@ -58,7 +56,7 @@ LOG_LEVEL=info
 
 `APP_URL` deve ser a origem HTTPS exata, sem caminho, por exemplo `https://bigspd.vercel.app`. Alterações em variáveis só entram em um novo deployment; faça redeploy após ajustá-las.
 
-O token da Meta, WABA ID e Phone Number ID podem ser cadastrados na interface depois do deploy. Se preferir ambiente, adicione `META_ACCESS_TOKEN`, `META_WABA_ID` e `META_PHONE_NUMBER_ID` tanto na Vercel quanto no worker.
+WABA ID, Phone Number ID, access token, App Secret e Webhook Verify Token são cadastrados na interface depois do deploy e ficam cifrados no PostgreSQL. Se preferir configuração por ambiente, continuam disponíveis `META_ACCESS_TOKEN`, `META_WABA_ID`, `META_PHONE_NUMBER_ID`, `META_WEBHOOK_APP_SECRET` e `META_WEBHOOK_VERIFY_TOKEN`.
 
 ## 4. Migrations e primeiro deploy
 

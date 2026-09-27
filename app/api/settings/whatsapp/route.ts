@@ -10,6 +10,8 @@ const schema = z.object({
   wabaId: z.string().min(1).max(100),
   phoneNumberId: z.string().min(1).max(100),
   accessToken: z.string().min(20).optional(),
+  appSecret: z.string().min(16).max(500).optional(),
+  webhookVerifyToken: z.string().min(16).max(500).optional(),
   apiVersion: z.string().regex(/^v\d+\.\d+$/),
   displayPhoneNumber: z.string().max(80).optional(),
   businessName: z.string().max(200).optional(),
@@ -26,6 +28,8 @@ export async function GET() {
       businessName: account.businessName, status: account.status,
       lastConnectionTestAt: account.lastConnectionTestAt,
       hasAccessToken: Boolean(account.accessTokenEncrypted || getEnv().META_ACCESS_TOKEN),
+      hasAppSecret: Boolean(account.appSecretEncrypted || getEnv().META_WEBHOOK_APP_SECRET || getEnv().META_APP_SECRET),
+      hasWebhookVerifyToken: Boolean(account.verifyTokenEncrypted || getEnv().META_WEBHOOK_VERIFY_TOKEN),
     };
   });
 }
@@ -37,9 +41,25 @@ export async function PUT(request: Request) {
     const body = schema.parse(await request.json());
     const env = getEnv();
     const current = await prisma.whatsAppAccount.findFirst({ where: { userId: session.userId } });
-    const token = body.accessToken ? encryptSecret(body.accessToken, env.SETTINGS_ENCRYPTION_KEY) : current?.accessTokenEncrypted;
-    const data = { ...body, accessTokenEncrypted: token };
-    delete (data as { accessToken?: string }).accessToken;
+    const accessTokenEncrypted = body.accessToken
+      ? encryptSecret(body.accessToken, env.SETTINGS_ENCRYPTION_KEY)
+      : current?.accessTokenEncrypted;
+    const appSecretEncrypted = body.appSecret
+      ? encryptSecret(body.appSecret, env.SETTINGS_ENCRYPTION_KEY)
+      : current?.appSecretEncrypted;
+    const verifyTokenEncrypted = body.webhookVerifyToken
+      ? encryptSecret(body.webhookVerifyToken, env.SETTINGS_ENCRYPTION_KEY)
+      : current?.verifyTokenEncrypted;
+    const data = {
+      wabaId: body.wabaId,
+      phoneNumberId: body.phoneNumberId,
+      apiVersion: body.apiVersion,
+      displayPhoneNumber: body.displayPhoneNumber,
+      businessName: body.businessName,
+      accessTokenEncrypted,
+      appSecretEncrypted,
+      verifyTokenEncrypted,
+    };
     const account = current
       ? await prisma.whatsAppAccount.update({ where: { id: current.id }, data })
       : await prisma.whatsAppAccount.create({ data: { ...data, userId: session.userId } });

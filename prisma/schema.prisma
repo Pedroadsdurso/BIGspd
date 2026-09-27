@@ -120,6 +120,8 @@ model WhatsAppAccount {
   displayPhoneNumber   String?          @map("display_phone_number")
   businessName         String?          @map("business_name")
   accessTokenEncrypted String?          @map("access_token_encrypted") @db.Text
+  appSecretEncrypted   String?          @map("app_secret_encrypted") @db.Text
+  verifyTokenEncrypted String?          @map("verify_token_encrypted") @db.Text
   apiVersion           String           @default("v25.0") @map("api_version")
   status               ConnectionStatus @default(DISCONNECTED)
   lastConnectionTestAt DateTime?        @map("last_connection_test_at")
