@@ -1,17 +1,23 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { hash as bcryptHash } from "bcryptjs";
 import { PrismaClient } from "../lib/generated/prisma/client";
 
-const required = ["DATABASE_URL", "OWNER_EMAIL", "OWNER_PASSWORD_HASH"] as const;
+const required = ["DATABASE_URL", "OWNER_EMAIL"] as const;
 for (const key of required) if (!process.env[key]) throw new Error(`${key} é obrigatório para executar o seed.`);
+if (!process.env.OWNER_PASSWORD_HASH?.trim() && !process.env.OWNER_PASSWORD?.trim()) {
+  throw new Error("Defina OWNER_PASSWORD_HASH ou OWNER_PASSWORD para executar o seed.");
+}
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
 async function main() {
+  const passwordHash = process.env.OWNER_PASSWORD_HASH?.trim() ?? (await bcryptHash(process.env.OWNER_PASSWORD!, 12));
+  const email = process.env.OWNER_EMAIL!.trim().toLowerCase();
   const user = await prisma.user.upsert({
-    where: { email: process.env.OWNER_EMAIL!.toLowerCase() },
-    create: { email: process.env.OWNER_EMAIL!.toLowerCase(), name: "Proprietário", passwordHash: process.env.OWNER_PASSWORD_HASH! },
-    update: { passwordHash: process.env.OWNER_PASSWORD_HASH! },
+    where: { email },
+    create: { email, name: "Proprietário", passwordHash },
+    update: { passwordHash },
   });
   if (process.env.META_CLIENT_MODE === "mock") {
     const account = await prisma.whatsAppAccount.upsert({

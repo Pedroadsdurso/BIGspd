@@ -11,6 +11,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DIRECT_URL: ${{ secrets.DIRECT_URL }}
       OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+      OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
       OWNER_PASSWORD_HASH: ${{ secrets.OWNER_PASSWORD_HASH }}
       META_CLIENT_MODE: live
     steps:
@@ -20,5 +21,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Creates all tables. This alone fixes login (the app creates the owner
+      # on first successful sign-in).
       - run: npm run db:deploy
+      # Optional: pre-creates the owner row. Non-fatal so a missing owner
+      # secret does not fail the whole run.
       - run: npm run db:seed
+        continue-on-error: true
