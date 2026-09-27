@@ -1,0 +1,3 @@
+import { cn } from "@/lib/utils";
+const tones = { neutral: "bg-[var(--surface-muted)] text-[var(--muted)]", success: "bg-[var(--primary-soft)] text-[var(--primary-strong)]", warning: "bg-amber-500/12 text-[var(--warning)]", danger: "bg-red-500/12 text-[var(--danger)]", info: "bg-blue-500/12 text-blue-600 dark:text-blue-300" };
+export function Badge({ children, tone = "neutral", className }: { children: React.ReactNode; tone?: keyof typeof tones; className?: string }) { return <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", tones[tone], className)}>{children}</span>; }

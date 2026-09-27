@@ -1,0 +1,9 @@
+import { z } from "zod";
+import { withApi } from "@/lib/api/response";
+import { requireApiUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/prisma";
+import { assertSameOrigin } from "@/lib/security/request";
+import { Prisma } from "@/lib/generated/prisma/client";
+const schema = z.object({ name: z.string().min(1).max(160).optional(), description: z.string().max(500).nullable().optional(), tags: z.array(z.string()).optional(), filters: z.record(z.string(), z.unknown()).nullable().optional() });
+export async function PATCH(request: Request, context: RouteContext<"/api/lists/[id]">) { return withApi(async () => { assertSameOrigin(request); const session = await requireApiUser(); const { id } = await context.params; const exists = await prisma.contactList.findFirst({ where: { id, userId: session.userId } }); if (!exists) return Response.json({ error: "Lista não encontrada" }, { status: 404 }); const body = schema.parse(await request.json()); return prisma.contactList.update({ where: { id }, data: { ...body, filters: body.filters === null ? Prisma.JsonNull : body.filters as Prisma.InputJsonValue | undefined } }); }); }
+export async function DELETE(request: Request, context: RouteContext<"/api/lists/[id]">) { return withApi(async () => { assertSameOrigin(request); const session = await requireApiUser(); const { id } = await context.params; const exists = await prisma.contactList.findFirst({ where: { id, userId: session.userId }, include: { _count: { select: { campaigns: true } } } }); if (!exists) return Response.json({ error: "Lista não encontrada" }, { status: 404 }); if (exists._count.campaigns) return Response.json({ error: "Lista vinculada a campanhas não pode ser excluída" }, { status: 409 }); await prisma.contactList.delete({ where: { id } }); return { deleted: true }; }); }

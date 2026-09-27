@@ -1,0 +1,8 @@
+import { z } from "zod";
+import { withApi } from "@/lib/api/response";
+import { requireApiUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/prisma";
+import { assertSameOrigin } from "@/lib/security/request";
+
+export async function POST(request: Request, context: RouteContext<"/api/lists/[id]/members">) { return withApi(async () => { assertSameOrigin(request); const session = await requireApiUser(); const { id } = await context.params; const body = z.object({ contactIds: z.array(z.string()).min(1).max(1000) }).parse(await request.json()); const list = await prisma.contactList.findFirst({ where: { id, userId: session.userId } }); if (!list) return Response.json({ error: "Lista não encontrada" }, { status: 404 }); const contacts = await prisma.contact.findMany({ where: { id: { in: body.contactIds }, userId: session.userId }, select: { id: true } }); await prisma.contactListMember.createMany({ data: contacts.map((contact) => ({ listId: id, contactId: contact.id })), skipDuplicates: true }); return { added: contacts.length }; }); }
+export async function DELETE(request: Request, context: RouteContext<"/api/lists/[id]/members">) { return withApi(async () => { assertSameOrigin(request); const session = await requireApiUser(); const { id } = await context.params; const contactId = new URL(request.url).searchParams.get("contactId"); if (!contactId) return Response.json({ error: "contactId obrigatório" }, { status: 400 }); const list = await prisma.contactList.findFirst({ where: { id, userId: session.userId } }); if (!list) return Response.json({ error: "Lista não encontrada" }, { status: 404 }); await prisma.contactListMember.deleteMany({ where: { listId: id, contactId } }); return { removed: true }; }); }

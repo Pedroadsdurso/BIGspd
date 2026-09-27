@@ -1,0 +1,11 @@
+.git
+.github
+.next
+.vercel
+node_modules
+coverage
+lib/generated/prisma
+.env
+.env.*
+!.env.example
+npm-debug.log*

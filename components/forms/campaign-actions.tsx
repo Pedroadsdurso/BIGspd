@@ -1,0 +1,5 @@
+"use client";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+export function CampaignActions({ id, status }: { id: string; status: string }) { const router = useRouter(); async function run(action: string) { const response = await fetch(`/api/campaigns/${id}/${action}`, { method: "POST" }); const data = await response.json(); if (!response.ok) return toast.error(data.error || "Ação recusada"); toast.success(action === "start" ? `${data.queued} destinatários adicionados à fila` : "Campanha atualizada"); router.refresh(); } return <div className="flex flex-wrap gap-2">{["DRAFT", "SCHEDULED"].includes(status) && <Button onClick={() => run("start")}>Iniciar</Button>}{["QUEUED", "RUNNING"].includes(status) && <Button variant="secondary" onClick={() => run("pause")}>Pausar</Button>}{status === "PAUSED" && <Button onClick={() => run("resume")}>Retomar</Button>}{!["COMPLETED", "CANCELLED"].includes(status) && <Button variant="danger" onClick={() => run("cancel")}>Cancelar</Button>}</div>; }

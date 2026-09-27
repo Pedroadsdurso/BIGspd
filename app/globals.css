@@ -1,1 +1,46 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f3f7f5;
+  --foreground: #10221c;
+  --surface: #ffffff;
+  --surface-muted: #eaf1ed;
+  --border: #d5e1db;
+  --muted: #5f7169;
+  --primary: #0b7a55;
+  --primary-strong: #075c41;
+  --primary-soft: #dff7ed;
+  --danger: #b42318;
+  --warning: #a15c00;
+  --shadow: 0 18px 50px rgba(13, 41, 31, 0.08);
+}
+
+.dark {
+  --background: #06110d;
+  --foreground: #ecf8f2;
+  --surface: #0b1c16;
+  --surface-muted: #102820;
+  --border: #1e3b30;
+  --muted: #93a99f;
+  --primary: #2ce6a0;
+  --primary-strong: #58f0b8;
+  --primary-soft: #103a2d;
+  --danger: #ff8279;
+  --warning: #ffbd61;
+  --shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
+}
+
+* { border-color: var(--border); }
+html { background: var(--background); }
+body {
+  min-height: 100vh;
+  background: radial-gradient(circle at 85% -10%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 30rem), var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+button, input, select, textarea { font: inherit; }
+::selection { background: var(--primary); color: #04100b; }
+.grid-dots { background-image: radial-gradient(color-mix(in srgb, var(--muted) 22%, transparent) 1px, transparent 1px); background-size: 22px 22px; }

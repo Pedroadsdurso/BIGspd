@@ -1,0 +1,380 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  OWNER
+}
+
+enum ConnectionStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+}
+
+enum PhoneStatus {
+  VALID
+  INVALID_PHONE
+}
+
+enum ConsentStatus {
+  UNKNOWN
+  OPTED_IN
+  OPTED_OUT
+}
+
+enum TemplateStatus {
+  APPROVED
+  PENDING
+  REJECTED
+  PAUSED
+  DISABLED
+  UNKNOWN
+}
+
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+  UNKNOWN
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum RecipientStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
+enum MessageDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum MessageType {
+  TEMPLATE
+  TEXT
+  IMAGE
+  DOCUMENT
+  AUDIO
+  VIDEO
+  INTERACTIVE
+  UNKNOWN
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  name             String?
+  passwordHash     String
+  role             UserRole          @default(OWNER)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  whatsappAccounts WhatsAppAccount[]
+  contacts         Contact[]
+  contactLists     ContactList[]
+  campaigns        Campaign[]
+  importJobs       ImportJob[]
+
+  @@map("users")
+}
+
+model WhatsAppAccount {
+  id                   String           @id @default(cuid())
+  userId               String           @map("user_id")
+  wabaId               String           @map("waba_id")
+  phoneNumberId        String           @map("phone_number_id")
+  displayPhoneNumber   String?          @map("display_phone_number")
+  businessName         String?          @map("business_name")
+  accessTokenEncrypted String?          @map("access_token_encrypted") @db.Text
+  apiVersion           String           @default("v25.0") @map("api_version")
+  status               ConnectionStatus @default(DISCONNECTED)
+  lastConnectionTestAt DateTime?        @map("last_connection_test_at")
+  lastError            String?          @map("last_error") @db.Text
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templates            Template[]
+
+  @@unique([userId, phoneNumberId])
+  @@index([wabaId])
+  @@map("whatsapp_accounts")
+}
+
+model Contact {
+  id                 String              @id @default(cuid())
+  userId             String              @map("user_id")
+  name               String
+  phone              String
+  phoneStatus        PhoneStatus         @default(VALID) @map("phone_status")
+  email              String?
+  company            String?
+  tags               String[]            @default([])
+  customFields       Json                @default("{}") @map("custom_fields")
+  consentStatus      ConsentStatus       @default(UNKNOWN) @map("consent_status")
+  optInAt            DateTime?           @map("opt_in_at")
+  optInSource        String?             @map("opt_in_source")
+  optInMethod        String?             @map("opt_in_method")
+  optInCategory      String?             @map("opt_in_category")
+  optInEvidence      String?             @map("opt_in_evidence") @db.Text
+  optOut             Boolean             @default(false) @map("opt_out")
+  optOutAt           DateTime?           @map("opt_out_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listMemberships    ContactListMember[]
+  campaignRecipients CampaignRecipient[]
+  messages           Message[]
+  suppression        SuppressionEntry?
+  consentAuditLogs   ConsentAuditLog[]
+
+  @@unique([userId, phone])
+  @@index([phone])
+  @@index([consentStatus, optOut])
+  @@index([createdAt])
+  @@map("contacts")
+}
+
+model ContactList {
+  id          String              @id @default(cuid())
+  userId      String              @map("user_id")
+  name        String
+  description String?
+  tags        String[]            @default([])
+  filters     Json?               @map("filters")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  members     ContactListMember[]
+  campaigns   Campaign[]
+
+  @@unique([userId, name])
+  @@index([createdAt])
+  @@map("contact_lists")
+}
+
+model ContactListMember {
+  listId    String      @map("list_id")
+  contactId String      @map("contact_id")
+  addedAt   DateTime    @default(now()) @map("added_at")
+  list      ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  contact   Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([listId, contactId])
+  @@index([contactId])
+  @@map("contact_list_members")
+}
+
+model Template {
+  id           String           @id @default(cuid())
+  accountId    String           @map("account_id")
+  providerId   String?          @map("provider_id")
+  name         String
+  language     String
+  category     TemplateCategory @default(UNKNOWN)
+  status       TemplateStatus   @default(UNKNOWN)
+  components   Json
+  variables    Json             @default("[]")
+  lastSyncedAt DateTime         @default(now()) @map("last_synced_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  account      WhatsAppAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaigns    Campaign[]
+
+  @@unique([accountId, name, language])
+  @@index([status])
+  @@map("templates")
+}
+
+model Campaign {
+  id              String              @id @default(cuid())
+  userId          String              @map("user_id")
+  listId          String              @map("list_id")
+  templateId      String              @map("template_id")
+  name            String
+  status          CampaignStatus      @default(DRAFT)
+  category        TemplateCategory
+  language        String
+  variableMapping Json                @map("variable_mapping")
+  scheduledAt     DateTime?           @map("scheduled_at")
+  timezone        String              @default("America/Sao_Paulo")
+  startedAt       DateTime?           @map("started_at")
+  finishedAt      DateTime?           @map("finished_at")
+  pausedAt        DateTime?           @map("paused_at")
+  cancelledAt     DateTime?           @map("cancelled_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  list            ContactList         @relation(fields: [listId], references: [id], onDelete: Restrict)
+  template        Template            @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  recipients      CampaignRecipient[]
+  messages        Message[]
+
+  @@index([userId, status])
+  @@index([scheduledAt])
+  @@index([createdAt])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id                String          @id @default(cuid())
+  campaignId        String          @map("campaign_id")
+  contactId         String          @map("contact_id")
+  phone             String
+  status            RecipientStatus @default(PENDING)
+  idempotencyKey    String          @unique @map("idempotency_key")
+  renderedVariables Json            @map("rendered_variables")
+  attempts          Int             @default(0)
+  providerMessageId String?         @map("provider_message_id")
+  scheduledAt       DateTime?       @map("scheduled_at")
+  queuedAt          DateTime?       @map("queued_at")
+  sentAt            DateTime?       @map("sent_at")
+  deliveredAt       DateTime?       @map("delivered_at")
+  readAt            DateTime?       @map("read_at")
+  failedAt          DateTime?       @map("failed_at")
+  errorCode         String?         @map("error_code")
+  errorMessage      String?         @map("error_message") @db.Text
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  campaign          Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact           Contact         @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  messages          Message[]
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@index([contactId])
+  @@index([providerMessageId])
+  @@index([createdAt])
+  @@map("campaign_recipients")
+}
+
+model Message {
+  id                  String             @id @default(cuid())
+  campaignId          String?            @map("campaign_id")
+  campaignRecipientId String?            @map("campaign_recipient_id")
+  contactId           String             @map("contact_id")
+  providerMessageId   String?            @unique @map("provider_message_id")
+  direction           MessageDirection
+  type                MessageType
+  status              RecipientStatus
+  content             Json
+  providerPayload     Json?              @map("provider_payload")
+  sentAt              DateTime?          @map("sent_at")
+  deliveredAt         DateTime?          @map("delivered_at")
+  readAt              DateTime?          @map("read_at")
+  failedAt            DateTime?          @map("failed_at")
+  errorCode           String?            @map("error_code")
+  errorMessage        String?            @map("error_message") @db.Text
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  campaign            Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignRecipient   CampaignRecipient? @relation(fields: [campaignRecipientId], references: [id], onDelete: SetNull)
+  contact             Contact            @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  @@index([campaignId])
+  @@index([campaignRecipientId])
+  @@index([contactId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model WebhookEvent {
+  id              String    @id @default(cuid())
+  eventKey        String    @unique @map("event_key")
+  objectType      String    @map("object_type")
+  payload         Json
+  signatureValid  Boolean   @map("signature_valid")
+  processedAt     DateTime? @map("processed_at")
+  processingError String?   @map("processing_error") @db.Text
+  receivedAt      DateTime  @default(now()) @map("received_at")
+
+  @@index([processedAt])
+  @@index([receivedAt])
+  @@map("webhook_events")
+}
+
+model SuppressionEntry {
+  id        String   @id @default(cuid())
+  contactId String?  @unique @map("contact_id")
+  phone     String   @unique
+  reason    String
+  source    String
+  createdAt DateTime @default(now()) @map("created_at")
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("suppression_entries")
+}
+
+model ConsentAuditLog {
+  id             String         @id @default(cuid())
+  contactId      String         @map("contact_id")
+  previousStatus ConsentStatus? @map("previous_status")
+  newStatus      ConsentStatus  @map("new_status")
+  source         String
+  method         String?
+  category       String?
+  evidence       String?        @db.Text
+  metadata       Json?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  contact        Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+  @@map("consent_audit_logs")
+}
+
+model ImportJob {
+  id            String       @id @default(cuid())
+  userId        String       @map("user_id")
+  listId        String?      @map("list_id")
+  fileName      String       @map("file_name")
+  delimiter     String
+  mapping       Json
+  status        ImportStatus @default(PENDING)
+  totalRows     Int          @default(0) @map("total_rows")
+  importedRows  Int          @default(0) @map("imported_rows")
+  duplicateRows Int          @default(0) @map("duplicate_rows")
+  invalidRows   Int          @default(0) @map("invalid_rows")
+  existingRows  Int          @default(0) @map("existing_rows")
+  report        Json?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  completedAt   DateTime?    @map("completed_at")
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("import_jobs")
+}
