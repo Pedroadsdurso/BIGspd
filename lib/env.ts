@@ -8,7 +8,11 @@ const schema = z.object({
   AUTH_SECRET: z.string().min(32),
   OWNER_EMAIL: z.string().email(),
   OWNER_PASSWORD_HASH: z.string().min(20),
-  SETTINGS_ENCRYPTION_KEY: z.string().min(1),
+  SETTINGS_ENCRYPTION_KEY: z
+    .string()
+    .refine((v) => Buffer.from(v, "base64").length === 32, {
+      message: "SETTINGS_ENCRYPTION_KEY deve conter exatamente 32 bytes em base64.",
+    }),
   META_APP_ID: z.string().optional(),
   META_APP_SECRET: z.string().optional(),
   META_ACCESS_TOKEN: z.string().optional(),
