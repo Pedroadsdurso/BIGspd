@@ -13,7 +13,12 @@ export function LoginForm() {
     const form = new FormData(event.currentTarget);
     const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) });
     setLoading(false);
-    if (!response.ok) return toast.error("Credenciais inválidas");
+    if (!response.ok) {
+      const message = response.status === 401
+        ? "Credenciais inválidas"
+        : await response.json().then((b) => b?.error as string | undefined).catch(() => undefined) ?? `Falha no login (${response.status})`;
+      return toast.error(message);
+    }
     router.replace("/dashboard"); router.refresh();
   }}><div><Label htmlFor="email">E-mail do proprietário</Label><Input id="email" name="email" type="email" autoComplete="email" required /></div><div><Label htmlFor="password">Senha</Label><Input id="password" name="password" type="password" autoComplete="current-password" required /></div><Button className="w-full" disabled={loading}>{loading ? "Entrando…" : "Entrar"}</Button></form>;
 }
