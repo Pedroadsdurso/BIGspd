@@ -1,5 +1,5 @@
 import "server-only";
-import { compare } from "bcryptjs";
+import { compare, hash as bcryptHash } from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -14,12 +14,25 @@ function secret() {
 
 export async function verifyOwnerCredentials(email: string, password: string) {
   const env = getEnv();
-  if (email.toLowerCase() !== env.OWNER_EMAIL.toLowerCase()) return null;
-  if (!(await compare(password, env.OWNER_PASSWORD_HASH))) return null;
+  if (email.trim().toLowerCase() !== env.OWNER_EMAIL.trim().toLowerCase()) return null;
+
+  // Accept a bcrypt hash or a plaintext password. Trim the env value so a
+  // trailing newline from an env import doesn't break the comparison.
+  const configuredHash = env.OWNER_PASSWORD_HASH?.trim();
+  const configuredPlain = env.OWNER_PASSWORD;
+  const ok = configuredHash
+    ? await compare(password, configuredHash)
+    : configuredPlain
+      ? password === configuredPlain
+      : false;
+  if (!ok) return null;
+
+  const passwordHash = configuredHash ?? (await bcryptHash(configuredPlain!, 12));
+  const ownerEmail = env.OWNER_EMAIL.trim().toLowerCase();
   return prisma.user.upsert({
-    where: { email: env.OWNER_EMAIL.toLowerCase() },
-    create: { email: env.OWNER_EMAIL.toLowerCase(), passwordHash: env.OWNER_PASSWORD_HASH, name: "Proprietário" },
-    update: { passwordHash: env.OWNER_PASSWORD_HASH },
+    where: { email: ownerEmail },
+    create: { email: ownerEmail, passwordHash, name: "Proprietário" },
+    update: { passwordHash },
   });
 }
 

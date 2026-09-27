@@ -7,7 +7,10 @@ const schema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   AUTH_SECRET: z.string().min(32),
   OWNER_EMAIL: z.string().email(),
-  OWNER_PASSWORD_HASH: z.string().min(20),
+  // Provide the owner password as EITHER a bcrypt hash OR plaintext. Plaintext
+  // avoids the `$` in bcrypt hashes being mangled by shell/CLI env imports.
+  OWNER_PASSWORD_HASH: z.string().min(20).optional(),
+  OWNER_PASSWORD: z.string().min(8).optional(),
   SETTINGS_ENCRYPTION_KEY: z
     .string()
     .refine((v) => Buffer.from(v, "base64").length === 32, {
@@ -26,6 +29,9 @@ const schema = z.object({
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
   WORKER_MAX_PER_SECOND: z.coerce.number().int().min(1).max(1000).default(5),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+}).refine((env) => Boolean(env.OWNER_PASSWORD_HASH || env.OWNER_PASSWORD), {
+  message: "Defina OWNER_PASSWORD_HASH ou OWNER_PASSWORD.",
+  path: ["OWNER_PASSWORD"],
 });
 
 export type AppEnv = z.infer<typeof schema>;

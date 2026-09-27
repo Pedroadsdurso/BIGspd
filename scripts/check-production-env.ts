@@ -4,7 +4,6 @@ const required = [
   "APP_URL",
   "AUTH_SECRET",
   "OWNER_EMAIL",
-  "OWNER_PASSWORD_HASH",
   "SETTINGS_ENCRYPTION_KEY",
 ] as const;
 
@@ -12,6 +11,10 @@ const failures: string[] = [];
 
 for (const key of required) {
   if (!process.env[key]?.trim()) failures.push(`${key} não foi definido.`);
+}
+
+if (!process.env.OWNER_PASSWORD_HASH?.trim() && !process.env.OWNER_PASSWORD?.trim()) {
+  failures.push("Defina OWNER_PASSWORD_HASH ou OWNER_PASSWORD.");
 }
 
 if (process.env.META_CLIENT_MODE !== "live") {
