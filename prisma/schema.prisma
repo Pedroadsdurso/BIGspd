@@ -88,6 +88,11 @@ enum MessageType {
   UNKNOWN
 }
 
+enum AutoReplyMatch {
+  CONTAINS
+  EXACT
+}
+
 enum ImportStatus {
   PENDING
   PROCESSING
@@ -108,6 +113,7 @@ model User {
   contactLists     ContactList[]
   campaigns        Campaign[]
   importJobs       ImportJob[]
+  autoReplyRules   AutoReplyRule[]
 
   @@map("users")
 }
@@ -287,6 +293,7 @@ model Message {
   id                  String             @id @default(cuid())
   campaignId          String?            @map("campaign_id")
   campaignRecipientId String?            @map("campaign_recipient_id")
+  autoReplyRuleId     String?            @map("auto_reply_rule_id")
   contactId           String             @map("contact_id")
   providerMessageId   String?            @unique @map("provider_message_id")
   direction           MessageDirection
@@ -305,13 +312,33 @@ model Message {
   campaign            Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   campaignRecipient   CampaignRecipient? @relation(fields: [campaignRecipientId], references: [id], onDelete: SetNull)
   contact             Contact            @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  autoReplyRule       AutoReplyRule?     @relation(fields: [autoReplyRuleId], references: [id], onDelete: SetNull)
 
   @@index([campaignId])
   @@index([campaignRecipientId])
+  @@index([autoReplyRuleId, contactId, createdAt])
   @@index([contactId])
   @@index([status])
   @@index([createdAt])
   @@map("messages")
+}
+
+model AutoReplyRule {
+  id              String         @id @default(cuid())
+  userId          String         @map("user_id")
+  name            String
+  keywords        String[]       @default([])
+  matchType       AutoReplyMatch @default(CONTAINS) @map("match_type")
+  replyText       String         @map("reply_text") @db.Text
+  active          Boolean        @default(true)
+  cooldownMinutes Int            @default(60) @map("cooldown_minutes")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        Message[]
+
+  @@index([userId, active])
+  @@map("auto_reply_rules")
 }
 
 model WebhookEvent {

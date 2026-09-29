@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { extractWebhookEvents, isOptOutText } from "@/lib/webhooks/parser";
 import { normalizePhone } from "@/lib/contacts/phone";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { runAutoReply } from "@/lib/automations/service";
 
 const statusMap = {
   sent: "SENT",
@@ -11,6 +12,18 @@ const statusMap = {
   read: "READ",
   failed: "FAILED",
 } as const;
+
+const inboundTypeMap: Record<string, "TEXT" | "IMAGE" | "DOCUMENT" | "AUDIO" | "VIDEO" | "INTERACTIVE"> = {
+  text: "TEXT",
+  image: "IMAGE",
+  sticker: "IMAGE",
+  document: "DOCUMENT",
+  audio: "AUDIO",
+  voice: "AUDIO",
+  video: "VIDEO",
+  interactive: "INTERACTIVE",
+  button: "INTERACTIVE",
+};
 
 export async function persistAndProcessWebhook(rawBody: string, signatureValid: boolean) {
   const payload = JSON.parse(rawBody) as Record<string, unknown>;
@@ -62,7 +75,7 @@ export async function persistAndProcessWebhook(rawBody: string, signatureValid: 
             contactId: contact.id,
             providerMessageId: incoming.id,
             direction: "INBOUND",
-            type: incoming.type.toUpperCase() as "TEXT" | "IMAGE" | "DOCUMENT" | "AUDIO" | "VIDEO" | "INTERACTIVE" | "UNKNOWN",
+            type: inboundTypeMap[incoming.type] ?? "UNKNOWN",
             status: "DELIVERED",
             content: incoming as Prisma.InputJsonValue,
             deliveredAt: incoming.timestamp ? new Date(Number(incoming.timestamp) * 1_000) : new Date(),
@@ -70,7 +83,8 @@ export async function persistAndProcessWebhook(rawBody: string, signatureValid: 
         });
       }
       const text = incoming.text?.body;
-      if (text && isOptOutText(text)) {
+      const optingOut = Boolean(text && isOptOutText(text));
+      if (optingOut) {
         await prisma.$transaction([
           prisma.contact.update({ where: { id: contact.id }, data: { optOut: true, optOutAt: new Date(), consentStatus: "OPTED_OUT" } }),
           prisma.suppressionEntry.upsert({
@@ -81,6 +95,7 @@ export async function persistAndProcessWebhook(rawBody: string, signatureValid: 
           prisma.consentAuditLog.create({ data: { contactId: contact.id, newStatus: "OPTED_OUT", previousStatus: contact.consentStatus, source: "whatsapp_inbound", evidence: `Mensagem de opt-out recebida (${incoming.id})` } }),
         ]);
       }
+      if (!existing && !optingOut) await runAutoReply(owner.id, contact, incoming);
     }
     await prisma.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
     return { duplicate: false, statuses: statuses.length, messages: messages.length };
