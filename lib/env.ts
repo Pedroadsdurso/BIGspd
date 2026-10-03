@@ -27,7 +27,7 @@ const schema = z.object({
   META_CLIENT_MODE: z.enum(["live", "mock"]).default("mock"),
   DEFAULT_COUNTRY_CODE: z.string().regex(/^\d{1,3}$/).default("55"),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
-  // Limite de mensagens da Meta (destinatários únicos em 24h). Vazio = sem limite.
+  // Override manual do limite diário (destinatários únicos em 24h). Vazio = detecta o tier na Meta.
   META_DAILY_LIMIT: z.coerce.number().int().min(1).optional(),
   WORKER_MAX_PER_SECOND: z.coerce.number().int().min(1).max(1000).default(5),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),

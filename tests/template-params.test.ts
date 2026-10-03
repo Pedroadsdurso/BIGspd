@@ -41,3 +41,15 @@ describe("valor fixo no mapeamento", () => {
     expect(renderVariables({ name: "Pedro", phone: "55" }, { "header:media": "literal:https://meu.site/a.png", "1": "name" })).toEqual({ values: { "header:media": "https://meu.site/a.png", "1": "Pedro" }, missing: [] });
   });
 });
+
+describe("tier de limite da Meta", () => {
+  it("converte tiers em números", async () => {
+    const { parseMessagingTier } = await import("@/lib/meta/messaging-limit");
+    expect(parseMessagingTier("TIER_250")).toBe(250);
+    expect(parseMessagingTier("TIER_2K")).toBe(2_000);
+    expect(parseMessagingTier("TIER_100K")).toBe(100_000);
+    expect(parseMessagingTier("TIER_UNLIMITED")).toBe(Infinity);
+    expect(parseMessagingTier({ tier: "TIER_10K" })).toBe(10_000);
+    expect(parseMessagingTier(undefined)).toBeNull();
+  });
+});

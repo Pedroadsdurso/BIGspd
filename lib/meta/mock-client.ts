@@ -20,6 +20,7 @@ export class MockMetaWhatsAppClient implements MetaWhatsAppClient {
   async sendTextMessage(input: { to: string; text: string }) {
     return { messageId: `mock_wamid_${createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 24)}` };
   }
+  async getMessagingLimit() { return 250; }
   async getMessageStatus(messageId: string) { return { status: "WEBHOOK_REQUIRED" as const, messageId }; }
   async testConnection() {
     return { connected: true, wabaFound: true, phoneFound: true, apiAccessible: true, businessName: "Ambiente Mock", displayPhoneNumber: "+55 11 99999-0000" };

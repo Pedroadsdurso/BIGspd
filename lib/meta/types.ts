@@ -40,6 +40,8 @@ export interface MetaWhatsAppClient {
   getTemplates(): Promise<MetaTemplate[]>;
   sendTemplateMessage(input: SendTemplateInput): Promise<{ messageId: string }>;
   sendTextMessage(input: { to: string; text: string; previewUrl?: boolean }): Promise<{ messageId: string }>;
+  /** Limite diário de destinatários únicos do número/BM; null = não informado; Infinity = ilimitado. */
+  getMessagingLimit(): Promise<number | null>;
   getMessageStatus(messageId: string): Promise<{ status: "WEBHOOK_REQUIRED"; messageId: string }>;
   testConnection(): Promise<MetaConnectionResult>;
 }

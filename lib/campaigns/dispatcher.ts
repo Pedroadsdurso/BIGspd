@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getMetaClientForAccount } from "@/lib/meta/config";
 import { MetaApiError, isAccountBlockingError } from "@/lib/meta/errors";
 import { buildTemplateComponents } from "@/lib/meta/template-params";
+import { getDailyLimitStatus } from "@/lib/campaigns/limits";
 import { isTemporaryMetaFailure } from "@/lib/queue/campaign-queue";
 import { getEnv } from "@/lib/env";
 import { log } from "@/lib/logger";
@@ -118,17 +119,6 @@ async function completeFinishedCampaigns(campaignIds: string[]) {
   }
 }
 
-/** Destinatários únicos que receberam template nas últimas 24h (janela móvel da Meta). */
-export async function countSentLast24h() {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1_000);
-  const rows = await prisma.campaignRecipient.findMany({
-    where: { sentAt: { gte: since }, providerMessageId: { not: null } },
-    distinct: ["phone"],
-    select: { phone: true },
-  });
-  return rows.length;
-}
-
 /**
  * Envia destinatários vencidos direto do banco (sem Redis/worker), respeitando
  * WORKER_MAX_PER_SECOND e parando antes de `deadlineMs` para caber no maxDuration.
@@ -143,9 +133,10 @@ export async function dispatchDueRecipients(options: { campaignId?: string; dead
   let limitReached = false;
   while (Date.now() < options.deadlineMs) {
     // Recalcula a cada lote: outras execuções (cron/after) podem estar enviando em paralelo.
-    const remaining = env.META_DAILY_LIMIT ? env.META_DAILY_LIMIT - await countSentLast24h() : Infinity;
+    const { remaining, limit, resumesAt } = await getDailyLimitStatus();
     if (remaining <= 0) {
       limitReached = true;
+      log("info", "dispatch.daily_limit_reached", { limit, resumesAt: resumesAt?.toISOString() });
       break;
     }
     const now = new Date();

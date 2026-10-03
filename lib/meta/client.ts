@@ -1,5 +1,6 @@
 import type { MetaClientConfig, MetaConnectionResult, MetaPhoneNumber, MetaTemplate, MetaWhatsAppClient, SendTemplateInput } from "@/lib/meta/types";
-import { parseMetaError } from "@/lib/meta/errors";
+import { MetaApiError, parseMetaError } from "@/lib/meta/errors";
+import { parseMessagingTier } from "@/lib/meta/messaging-limit";
 
 type GraphPage<T> = { data: T[]; paging?: { next?: string } };
 
@@ -84,6 +85,21 @@ export class CloudApiMetaWhatsAppClient implements MetaWhatsAppClient {
     const messageId = response.messages?.[0]?.id;
     if (!messageId) throw new Error("A Meta aceitou a requisição sem retornar message ID.");
     return { messageId };
+  }
+
+  async getMessagingLimit() {
+    // Campo novo (limite por portfólio/BM) primeiro; o antigo por número como reserva.
+    // Campo inexistente na versão da API devolve erro #100, então tenta o próximo.
+    for (const field of ["whatsapp_business_manager_messaging_limit", "messaging_limit_tier"]) {
+      try {
+        const payload = await this.request<Record<string, unknown>>(`${this.config.phoneNumberId}?fields=${field}`);
+        const limit = parseMessagingTier(payload[field]);
+        if (limit !== null) return limit;
+      } catch (error) {
+        if (!(error instanceof MetaApiError && error.code === 100)) throw error;
+      }
+    }
+    return null;
   }
 
   async getMessageStatus(messageId: string) {
