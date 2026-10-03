@@ -2,6 +2,9 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getMetaClientForAccount } from "@/lib/meta/config";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { extractTemplateVariables } from "@/lib/meta/template-params";
+
+export { extractTemplateVariables };
 
 const categories = new Set(["MARKETING", "UTILITY", "AUTHENTICATION"]);
 const statuses = new Set(["APPROVED", "PENDING", "REJECTED", "PAUSED", "DISABLED"]);
@@ -40,12 +43,4 @@ export async function syncTemplates(userId: string) {
 export function toTemplateStatus(status: string | undefined) {
   const normalized = status?.toUpperCase();
   return normalized && statuses.has(normalized) ? normalized as "APPROVED" | "PENDING" | "REJECTED" | "PAUSED" | "DISABLED" : "UNKNOWN";
-}
-
-export function extractTemplateVariables(components: unknown[]) {
-  const variables = new Set<string>();
-  for (const component of components as Array<{ text?: string }>) {
-    for (const match of component.text?.matchAll(/\{\{\s*(\d+)\s*\}\}/g) ?? []) variables.add(match[1]);
-  }
-  return [...variables].sort((a, b) => Number(a) - Number(b));
 }

@@ -3,6 +3,7 @@ import { withApi } from "@/lib/api/response";
 import { requireApiUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { assertSameOrigin } from "@/lib/security/request";
+import { describeTemplateVariable, extractTemplateVariables } from "@/lib/meta/template-params";
 
 const schema = z.object({
   name: z.string().min(1).max(200),
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
     const body = schema.parse(await request.json());
     const template = await prisma.template.findUnique({ where: { id: body.templateId } });
     if (!template || template.status !== "APPROVED") return Response.json({ error: "Template inexistente ou não aprovado" }, { status: 400 });
+    const unmapped = extractTemplateVariables(template.components).filter((key) => !body.variableMapping[key]);
+    if (unmapped.length) return Response.json({ error: `Mapeie todas as variáveis do template: ${unmapped.map(describeTemplateVariable).join(", ")}` }, { status: 400 });
     const campaign = await prisma.campaign.create({
       data: {
         userId: session.userId,

@@ -50,10 +50,7 @@ export class CloudApiMetaWhatsAppClient implements MetaWhatsAppClient {
   }
 
   async sendTemplateMessage(input: SendTemplateInput) {
-    const components = input.bodyParameters.length ? [{
-      type: "body",
-      parameters: input.bodyParameters.map((text) => ({ type: "text", text })),
-    }] : undefined;
+    const components = input.components.length ? input.components : undefined;
     const response = await this.request<{ messages: Array<{ id: string }> }>(`${this.config.phoneNumberId}/messages`, {
       method: "POST",
       body: JSON.stringify({

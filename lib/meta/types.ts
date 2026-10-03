@@ -1,3 +1,5 @@
+import type { SendComponent } from "@/lib/meta/template-params";
+
 export type MetaConnectionResult = {
   connected: boolean;
   wabaFound: boolean;
@@ -28,7 +30,8 @@ export type SendTemplateInput = {
   to: string;
   templateName: string;
   language: string;
-  bodyParameters: string[];
+  /** Componentes já montados por buildTemplateComponents (header/body/button). */
+  components: SendComponent[];
 };
 
 export interface MetaWhatsAppClient {

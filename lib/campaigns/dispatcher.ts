@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getMetaClientForAccount } from "@/lib/meta/config";
 import { MetaApiError } from "@/lib/meta/errors";
+import { buildTemplateComponents } from "@/lib/meta/template-params";
 import { isTemporaryMetaFailure } from "@/lib/queue/campaign-queue";
 import { getEnv } from "@/lib/env";
 import { log } from "@/lib/logger";
@@ -34,12 +35,11 @@ export async function sendCampaignRecipient(recipientId: string): Promise<{ outc
   try {
     const client = await getMetaClientForAccount(recipient.campaign.template.account);
     const variables = recipient.renderedVariables as Record<string, string>;
-    const ordered = Object.entries(variables).sort(([a], [b]) => Number(a) - Number(b)).map(([, value]) => value);
     const sent = await client.sendTemplateMessage({
       to: recipient.phone,
       templateName: recipient.campaign.template.name,
       language: recipient.campaign.language,
-      bodyParameters: ordered,
+      components: buildTemplateComponents(recipient.campaign.template.components, variables),
     });
     const now = new Date();
     await prisma.$transaction([
