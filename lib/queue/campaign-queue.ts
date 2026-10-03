@@ -11,8 +11,13 @@ export function getCampaignQueue() {
   return queue;
 }
 
+/** BullMQ só é usado quando há Redis configurado; sem ele o envio sai pelo dispatcher (after() + cron). */
+export function isQueueEnabled() {
+  return Boolean(process.env.REDIS_URL);
+}
+
 export async function enqueueRecipients(recipients: Array<CampaignJob & { scheduledAt?: Date | null }>) {
-  if (!recipients.length) return;
+  if (!recipients.length || !isQueueEnabled()) return;
   const now = Date.now();
   await getCampaignQueue().addBulk(recipients.map((recipient) => ({
     name: "send-template",

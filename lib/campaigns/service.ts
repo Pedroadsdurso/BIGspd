@@ -95,6 +95,8 @@ export async function pauseCampaign(id: string, userId: string) {
 
 export async function resumeCampaign(id: string, userId: string) {
   const campaign = await prisma.campaign.update({ where: { id, userId }, data: { status: "QUEUED", pausedAt: null } });
+  // Destinatários devolvidos para PENDING durante a pausa voltam para a fila.
+  await prisma.campaignRecipient.updateMany({ where: { campaignId: id, status: "PENDING" }, data: { status: "QUEUED" } });
   const recipients = await prisma.campaignRecipient.findMany({ where: { campaignId: id, status: { in: ["PENDING", "QUEUED"] } } });
   await enqueueRecipients(recipients.map((recipient) => ({ recipientId: recipient.id, campaignId: id, idempotencyKey: recipient.idempotencyKey, scheduledAt: recipient.scheduledAt })));
   return campaign;

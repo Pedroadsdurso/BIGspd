@@ -1,8 +1,19 @@
+import { after } from "next/server";
 import { withApi } from "@/lib/api/response";
 import { requireApiUser } from "@/lib/auth/session";
 import { resumeCampaign } from "@/lib/campaigns/service";
+import { dispatchAfterResponse } from "@/lib/campaigns/dispatch-after";
 import { assertSameOrigin } from "@/lib/security/request";
 
+export const maxDuration = 300;
+
 export async function POST(request: Request, context: RouteContext<"/api/campaigns/[id]/resume">) {
-  return withApi(async () => { assertSameOrigin(request); const session = await requireApiUser(); return resumeCampaign((await context.params).id, session.userId); });
+  return withApi(async () => {
+    assertSameOrigin(request);
+    const session = await requireApiUser();
+    const { id } = await context.params;
+    const campaign = await resumeCampaign(id, session.userId);
+    after(() => dispatchAfterResponse(id));
+    return campaign;
+  });
 }
