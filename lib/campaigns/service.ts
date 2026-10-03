@@ -126,6 +126,23 @@ export async function resumeCampaign(id: string, userId: string) {
   return campaign;
 }
 
+/** Recoloca na fila as falhas que podem dar certo depois (limite, instabilidade), menos número inválido. */
+const PERMANENT_FAILURE_CODES = ["131026", "INELIGIBLE"];
+
+export async function retryFailedRecipients(id: string, userId: string) {
+  const campaign = await prisma.campaign.findFirst({ where: { id, userId } });
+  if (!campaign) throw new Error("Campanha não encontrada");
+  if (campaign.status === "CANCELLED") throw new Error("Campanha cancelada não pode reenviar");
+  const { count } = await prisma.campaignRecipient.updateMany({
+    where: { campaignId: id, status: "FAILED", OR: [{ errorCode: null }, { errorCode: { notIn: PERMANENT_FAILURE_CODES } }] },
+    data: { status: "QUEUED", providerMessageId: null, failedAt: null, attempts: 0, errorCode: null, errorMessage: null, queuedAt: new Date() },
+  });
+  if (count && ["COMPLETED", "FAILED"].includes(campaign.status)) {
+    await prisma.campaign.update({ where: { id }, data: { status: "QUEUED", finishedAt: null } });
+  }
+  return { requeued: count };
+}
+
 export async function cancelCampaign(id: string, userId: string) {
   return prisma.$transaction(async (tx) => {
     await tx.campaignRecipient.updateMany({

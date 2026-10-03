@@ -118,6 +118,17 @@ async function completeFinishedCampaigns(campaignIds: string[]) {
   }
 }
 
+/** Destinatários únicos que receberam template nas últimas 24h (janela móvel da Meta). */
+export async function countSentLast24h() {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1_000);
+  const rows = await prisma.campaignRecipient.findMany({
+    where: { sentAt: { gte: since }, providerMessageId: { not: null } },
+    distinct: ["phone"],
+    select: { phone: true },
+  });
+  return rows.length;
+}
+
 /**
  * Envia destinatários vencidos direto do banco (sem Redis/worker), respeitando
  * WORKER_MAX_PER_SECOND e parando antes de `deadlineMs` para caber no maxDuration.
@@ -129,7 +140,14 @@ export async function dispatchDueRecipients(options: { campaignId?: string; dead
   const touched: string[] = [];
   const attempted = new Set<string>();
 
+  let limitReached = false;
   while (Date.now() < options.deadlineMs) {
+    // Recalcula a cada lote: outras execuções (cron/after) podem estar enviando em paralelo.
+    const remaining = env.META_DAILY_LIMIT ? env.META_DAILY_LIMIT - await countSentLast24h() : Infinity;
+    if (remaining <= 0) {
+      limitReached = true;
+      break;
+    }
     const now = new Date();
     const batch = await prisma.campaignRecipient.findMany({
       where: {
@@ -147,7 +165,7 @@ export async function dispatchDueRecipients(options: { campaignId?: string; dead
       },
       select: { id: true, campaignId: true },
       orderBy: { createdAt: "asc" },
-      take: 25,
+      take: Math.min(25, remaining),
     });
     if (!batch.length) break;
 
@@ -165,6 +183,6 @@ export async function dispatchDueRecipients(options: { campaignId?: string; dead
   }
 
   await completeFinishedCampaigns(touched);
-  log("info", "dispatch.finished", { campaignId: options.campaignId, ...counts });
-  return counts;
+  log("info", "dispatch.finished", { campaignId: options.campaignId, limitReached, ...counts });
+  return { ...counts, limitReached };
 }
