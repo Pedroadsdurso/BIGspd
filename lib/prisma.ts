@@ -10,10 +10,11 @@ function createClient(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
+// Sempre em cache: o proxy abaixo chama getClient() a cada acesso, então sem
+// isso cada query abriria um PrismaClient (e um pool pg) novo em produção.
 function getClient(): PrismaClient {
-  const client = globalForPrisma.prisma ?? createClient();
-  if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
-  return client;
+  globalForPrisma.prisma ??= createClient();
+  return globalForPrisma.prisma;
 }
 
 // Lazy proxy: the real client (and env parsing) is created on first property
