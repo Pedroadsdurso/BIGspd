@@ -28,6 +28,16 @@ export function parseMetaError(status: number, payload: unknown, retryAfter?: st
   );
 }
 
+/**
+ * Erros que valem para a conta inteira (pagamento, token, conta bloqueada,
+ * número não registrado): continuar enviando só queimaria a lista.
+ */
+export const ACCOUNT_BLOCKING_CODES = new Set([190, 131031, 131042, 133010]);
+
+export function isAccountBlockingError(code?: number | string | null) {
+  return code != null && ACCOUNT_BLOCKING_CODES.has(Number(code));
+}
+
 export function recommendedMetaAction(error: MetaApiError) {
   if (error.httpStatus === 401 || error.code === 190) return "Renove o token e confirme as permissões do aplicativo.";
   if (error.httpStatus === 429 || error.code === 80007) return "Aguarde o Retry-After; o worker tentará novamente com backoff.";

@@ -6,6 +6,8 @@ import { normalizePhone } from "@/lib/contacts/phone";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { runAutoReply } from "@/lib/automations/service";
 import { toTemplateStatus } from "@/lib/meta/templates";
+import { isAccountBlockingError } from "@/lib/meta/errors";
+import { pauseCampaignsForAccountError } from "@/lib/campaigns/dispatcher";
 
 const statusMap = {
   sent: "SENT",
@@ -69,6 +71,11 @@ export async function persistAndProcessWebhook(rawBody: string, signatureValid: 
           data: { status: mapped, ...timeData, errorCode: error?.code ? String(error.code) : null, errorMessage: error?.message || error?.title || error?.error_data?.details },
         }),
       ]);
+      // Falha da conta (ex.: 131042 pagamento) chega pelo webhook: pausa para não queimar o resto da lista.
+      if (mapped === "FAILED" && isAccountBlockingError(error?.code)) {
+        const affected = await prisma.campaignRecipient.findMany({ where: { providerMessageId: status.id }, select: { campaignId: true } });
+        await pauseCampaignsForAccountError(affected.map((row) => row.campaignId));
+      }
     }
 
     for (const incoming of messages) {

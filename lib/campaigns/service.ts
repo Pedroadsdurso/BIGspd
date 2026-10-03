@@ -3,7 +3,15 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { isEligibleForCampaign } from "@/lib/campaigns/eligibility";
 import { renderVariables } from "@/lib/campaigns/variables";
-import { enqueueRecipients } from "@/lib/queue/campaign-queue";
+import { enqueueRecipients, isQueueEnabled } from "@/lib/queue/campaign-queue";
+
+const RECIPIENT_CHUNK = 1_000;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let index = 0; index < items.length; index += size) batches.push(items.slice(index, index + size));
+  return batches;
+}
 
 export async function prepareAndQueueCampaign(campaignId: string, userId: string) {
   const campaign = await prisma.campaign.findFirst({
@@ -46,47 +54,63 @@ export async function prepareAndQueueCampaign(campaignId: string, userId: string
     });
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const recipient of prepared) {
-      await tx.campaignRecipient.upsert({
-        where: { campaignId_contactId: { campaignId, contactId: recipient.contactId } },
-        create: {
-          campaignId,
-          contactId: recipient.contactId,
-          phone: recipient.phone,
-          status: recipient.status,
-          renderedVariables: recipient.variables,
-          idempotencyKey: recipient.idempotencyKey,
-          errorCode: recipient.error ? "INELIGIBLE" : null,
-          errorMessage: recipient.error,
-          scheduledAt: campaign.scheduledAt,
-          queuedAt: recipient.status === "QUEUED" ? new Date() : null,
-        },
-        update: {
-          status: recipient.status,
-          renderedVariables: recipient.variables,
-          errorCode: recipient.error ? "INELIGIBLE" : null,
-          errorMessage: recipient.error,
-          queuedAt: recipient.status === "QUEUED" ? new Date() : null,
-        },
-      });
-    }
-    await tx.campaign.update({
-      where: { id: campaignId },
+  // Gravação em lote: upsert linha a linha numa transação interativa estoura o
+  // timeout (5s) com listas grandes.
+  const existing = await prisma.campaignRecipient.findMany({
+    where: { campaignId },
+    select: { id: true, contactId: true, providerMessageId: true, status: true },
+  });
+  const existingByContact = new Map(existing.map((row) => [row.contactId, row]));
+  const queuedAt = new Date();
+  const toCreate = prepared.filter((recipient) => !existingByContact.has(recipient.contactId));
+  for (const batch of chunk(toCreate, RECIPIENT_CHUNK)) {
+    await prisma.campaignRecipient.createMany({
+      skipDuplicates: true,
+      data: batch.map((recipient) => ({
+        campaignId,
+        contactId: recipient.contactId,
+        phone: recipient.phone,
+        status: recipient.status,
+        renderedVariables: recipient.variables,
+        idempotencyKey: recipient.idempotencyKey,
+        errorCode: recipient.error ? "INELIGIBLE" : null,
+        errorMessage: recipient.error,
+        scheduledAt: campaign.scheduledAt,
+        queuedAt: recipient.status === "QUEUED" ? queuedAt : null,
+      })),
+    });
+  }
+  // Reinício (campanha pausada): só reprepara quem ainda não foi enviado.
+  for (const recipient of prepared) {
+    const row = existingByContact.get(recipient.contactId);
+    if (!row || row.providerMessageId || ["SENT", "DELIVERED", "READ", "CANCELLED"].includes(row.status)) continue;
+    await prisma.campaignRecipient.update({
+      where: { id: row.id },
       data: {
-        status: campaign.scheduledAt && campaign.scheduledAt > new Date() ? "SCHEDULED" : "QUEUED",
+        status: recipient.status,
+        renderedVariables: recipient.variables,
+        errorCode: recipient.error ? "INELIGIBLE" : null,
+        errorMessage: recipient.error,
+        queuedAt: recipient.status === "QUEUED" ? queuedAt : null,
       },
     });
+  }
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { status: campaign.scheduledAt && campaign.scheduledAt > new Date() ? "SCHEDULED" : "QUEUED" },
   });
 
-  const queued = await prisma.campaignRecipient.findMany({ where: { campaignId, status: "QUEUED" } });
-  await enqueueRecipients(queued.map((recipient) => ({
-    recipientId: recipient.id,
-    campaignId,
-    idempotencyKey: recipient.idempotencyKey,
-    scheduledAt: recipient.scheduledAt,
-  })));
-  return { total: prepared.length, queued: queued.length, skipped: prepared.length - queued.length };
+  const queuedCount = await prisma.campaignRecipient.count({ where: { campaignId, status: "QUEUED" } });
+  if (isQueueEnabled()) {
+    const queued = await prisma.campaignRecipient.findMany({ where: { campaignId, status: "QUEUED" } });
+    await enqueueRecipients(queued.map((recipient) => ({
+      recipientId: recipient.id,
+      campaignId,
+      idempotencyKey: recipient.idempotencyKey,
+      scheduledAt: recipient.scheduledAt,
+    })));
+  }
+  return { total: prepared.length, queued: queuedCount, skipped: prepared.length - queuedCount };
 }
 
 export async function pauseCampaign(id: string, userId: string) {

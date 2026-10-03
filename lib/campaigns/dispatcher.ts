@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getMetaClientForAccount } from "@/lib/meta/config";
-import { MetaApiError } from "@/lib/meta/errors";
+import { MetaApiError, isAccountBlockingError } from "@/lib/meta/errors";
 import { buildTemplateComponents } from "@/lib/meta/template-params";
 import { isTemporaryMetaFailure } from "@/lib/queue/campaign-queue";
 import { getEnv } from "@/lib/env";
@@ -8,7 +8,16 @@ import { log } from "@/lib/logger";
 
 export const MAX_SEND_ATTEMPTS = 3;
 
-export type SendOutcome = "sent" | "skipped" | "failed" | "retry";
+export type SendOutcome = "sent" | "skipped" | "failed" | "retry" | "paused";
+
+/** Pausa campanhas em andamento; os destinatários pendentes continuam na fila para o "Retomar". */
+export async function pauseCampaignsForAccountError(campaignIds: string[]) {
+  if (!campaignIds.length) return;
+  await prisma.campaign.updateMany({
+    where: { id: { in: [...new Set(campaignIds)] }, status: { in: ["QUEUED", "RUNNING", "SCHEDULED"] } },
+    data: { status: "PAUSED", pausedAt: new Date() },
+  });
+}
 
 /** Envia um destinatário. Idempotente: só quem conseguir "reivindicar" a linha envia. */
 export async function sendCampaignRecipient(recipientId: string): Promise<{ outcome: SendOutcome; error?: unknown }> {
@@ -64,6 +73,15 @@ export async function sendCampaignRecipient(recipientId: string): Promise<{ outc
     ]);
     return { outcome: "sent" };
   } catch (error) {
+    if (error instanceof MetaApiError && isAccountBlockingError(error.code)) {
+      // Problema da conta, não do contato: devolve à fila e pausa a campanha.
+      await prisma.campaignRecipient.update({
+        where: { id: recipient.id },
+        data: { status: "QUEUED", errorCode: String(error.code), errorMessage: `Campanha pausada: ${error.message}` },
+      });
+      await pauseCampaignsForAccountError([recipient.campaignId]);
+      return { outcome: "paused", error };
+    }
     const temporary = error instanceof MetaApiError && isTemporaryMetaFailure(error.httpStatus, error.code);
     const willRetry = temporary && attempt < MAX_SEND_ATTEMPTS;
     await prisma.campaignRecipient.update({
@@ -107,7 +125,7 @@ async function completeFinishedCampaigns(campaignIds: string[]) {
 export async function dispatchDueRecipients(options: { campaignId?: string; deadlineMs: number }) {
   const env = getEnv();
   const minIntervalMs = Math.ceil(1_000 / env.WORKER_MAX_PER_SECOND);
-  const counts: Record<SendOutcome, number> = { sent: 0, skipped: 0, failed: 0, retry: 0 };
+  const counts: Record<SendOutcome, number> = { sent: 0, skipped: 0, failed: 0, retry: 0, paused: 0 };
   const touched: string[] = [];
   const attempted = new Set<string>();
 
