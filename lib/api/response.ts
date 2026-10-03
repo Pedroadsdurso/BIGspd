@@ -1,5 +1,6 @@
 import { ZodError } from "zod";
 import { log } from "@/lib/logger";
+import { MetaApiError, recommendedMetaAction } from "@/lib/meta/errors";
 
 export function apiError(error: unknown) {
   if (error instanceof ZodError) {
@@ -13,6 +14,14 @@ export function apiError(error: unknown) {
   }
   if (error instanceof Error && error.message === "RATE_LIMITED") {
     return Response.json({ error: "Muitas requisições" }, { status: 429 });
+  }
+  if (error instanceof MetaApiError) {
+    log("warn", "api.meta_error", { error: error.message, code: error.code, subcode: error.subcode, httpStatus: error.httpStatus });
+    const status = error.httpStatus >= 400 && error.httpStatus < 600 ? error.httpStatus : 502;
+    return Response.json({ error: `Meta: ${error.userMessage || error.message}`, code: error.code, action: recommendedMetaAction(error) }, { status });
+  }
+  if (error instanceof Error && error.message.startsWith("Configur")) {
+    return Response.json({ error: error.message }, { status: 400 });
   }
   log("error", "api.unhandled_error", { error: error instanceof Error ? error.message : String(error) });
   return Response.json({ error: "Erro interno" }, { status: 500 });

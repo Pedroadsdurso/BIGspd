@@ -5,6 +5,7 @@ import { extractWebhookEvents, isOptOutText } from "@/lib/webhooks/parser";
 import { normalizePhone } from "@/lib/contacts/phone";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { runAutoReply } from "@/lib/automations/service";
+import { toTemplateStatus } from "@/lib/meta/templates";
 
 const statusMap = {
   sent: "SENT",
@@ -36,7 +37,20 @@ export async function persistAndProcessWebhook(rawBody: string, signatureValid: 
   if (event.processedAt) return { duplicate: true };
 
   try {
-    const { statuses, messages, contacts } = extractWebhookEvents(payload);
+    const { statuses, messages, contacts, templateStatuses } = extractWebhookEvents(payload);
+    for (const update of templateStatuses) {
+      const status = toTemplateStatus(update.event);
+      if (status === "UNKNOWN") continue;
+      const byProvider = update.message_template_id != null ? { providerId: String(update.message_template_id) } : undefined;
+      const byName = update.message_template_name && update.message_template_language
+        ? { name: update.message_template_name, language: update.message_template_language }
+        : undefined;
+      if (!byProvider && !byName) continue;
+      await prisma.template.updateMany({
+        where: { OR: [byProvider, byName].filter((clause) => clause !== undefined) },
+        data: { status, lastSyncedAt: new Date() },
+      });
+    }
     for (const status of statuses) {
       const mapped = statusMap[status.status];
       const timestamp = status.timestamp ? new Date(Number(status.timestamp) * 1_000) : new Date();
@@ -98,7 +112,7 @@ export async function persistAndProcessWebhook(rawBody: string, signatureValid: 
       if (!existing && !optingOut) await runAutoReply(owner.id, contact, incoming);
     }
     await prisma.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
-    return { duplicate: false, statuses: statuses.length, messages: messages.length };
+    return { duplicate: false, statuses: statuses.length, messages: messages.length, templates: templateStatuses.length };
   } catch (error) {
     await prisma.webhookEvent.update({ where: { id: event.id }, data: { processingError: error instanceof Error ? error.message : String(error) } });
     throw error;
