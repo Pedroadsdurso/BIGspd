@@ -23,14 +23,21 @@ describe("parâmetros de template", () => {
       { type: "BODY", text: "Olá" },
       { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "Sair" }, { type: "URL", url: "https://x.com/p/{{1}}" }] },
     ];
-    expect(extractTemplateVariables(components)).toEqual(["button:1:1"]);
-    expect(buildTemplateComponents(components, { "button:1:1": "abc" })).toEqual([
-      { type: "header", parameters: [{ type: "image", image: { link: "https://cdn.example/img.jpg" } }] },
+    expect(extractTemplateVariables(components)).toEqual(["header:media", "button:1:1"]);
+    expect(buildTemplateComponents(components, { "header:media": "https://meu.site/banner.png", "button:1:1": "abc" })).toEqual([
+      { type: "header", parameters: [{ type: "image", image: { link: "https://meu.site/banner.png" } }] },
       { type: "button", sub_type: "url", index: "1", parameters: [{ type: "text", text: "abc" }] },
     ]);
   });
 
   it("falha com mensagem clara quando falta valor", () => {
     expect(() => buildTemplateComponents([{ type: "HEADER", format: "TEXT", text: "{{1}}" }], {})).toThrow("Cabeçalho {{1}}");
+  });
+});
+
+describe("valor fixo no mapeamento", () => {
+  it("usa literal: sem consultar o contato", async () => {
+    const { renderVariables } = await import("@/lib/campaigns/variables");
+    expect(renderVariables({ name: "Pedro", phone: "55" }, { "header:media": "literal:https://meu.site/a.png", "1": "name" })).toEqual({ values: { "header:media": "https://meu.site/a.png", "1": "Pedro" }, missing: [] });
   });
 });

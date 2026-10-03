@@ -16,11 +16,14 @@ export function resolveContactField(contact: ContactFields, path: string): strin
   return value == null || value === "" ? undefined : String(value);
 }
 
+/** Valor fixo para todos os contatos (ex.: URL da mídia do cabeçalho). */
+export const LITERAL_PREFIX = "literal:";
+
 export function renderVariables(contact: ContactFields, mapping: Record<string, string>) {
   const values: Record<string, string> = {};
   const missing: string[] = [];
   for (const [position, source] of Object.entries(mapping)) {
-    const value = resolveContactField(contact, source);
+    const value = source.startsWith(LITERAL_PREFIX) ? source.slice(LITERAL_PREFIX.length).trim() : resolveContactField(contact, source);
     if (!value) missing.push(position);
     else values[position] = value;
   }

@@ -3,7 +3,7 @@ import { withApi } from "@/lib/api/response";
 import { requireApiUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { assertSameOrigin } from "@/lib/security/request";
-import { describeTemplateVariable, extractTemplateVariables } from "@/lib/meta/template-params";
+import { HEADER_MEDIA_KEY, describeTemplateVariable, extractTemplateVariables } from "@/lib/meta/template-params";
 
 const schema = z.object({
   name: z.string().min(1).max(200),
@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     if (!template || template.status !== "APPROVED") return Response.json({ error: "Template inexistente ou não aprovado" }, { status: 400 });
     const unmapped = extractTemplateVariables(template.components).filter((key) => !body.variableMapping[key]);
     if (unmapped.length) return Response.json({ error: `Mapeie todas as variáveis do template: ${unmapped.map(describeTemplateVariable).join(", ")}` }, { status: 400 });
+    const mediaSource = body.variableMapping[HEADER_MEDIA_KEY];
+    if (mediaSource !== undefined && !/^literal:https:\/\/\S+$/.test(mediaSource)) {
+      return Response.json({ error: "A mídia do cabeçalho precisa ser uma URL pública começando com https://" }, { status: 400 });
+    }
     const campaign = await prisma.campaign.create({
       data: {
         userId: session.userId,
