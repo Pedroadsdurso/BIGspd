@@ -6,7 +6,14 @@ import { getEnv } from "@/lib/env";
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient(): PrismaClient {
-  const adapter = new PrismaPg({ connectionString: getEnv().DATABASE_URL });
+  // Pool pequeno por instância: em serverless cada função abre o seu, e o
+  // dispatcher + cron em paralelo esgotavam as conexões do Postgres.
+  const adapter = new PrismaPg({
+    connectionString: getEnv().DATABASE_URL,
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+  });
   return new PrismaClient({ adapter });
 }
 
